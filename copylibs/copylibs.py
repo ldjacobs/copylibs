@@ -21,7 +21,7 @@ def find_so_files(opts: argparse.Namespace) -> list:
 
     for so_file in starting_path.glob("**/*.so"):
         if opts.verbose:
-            print(f"{Fore.GREEN}{so_file}{Fore.RESET}")
+            print(f"Processing: {Fore.GREEN}{so_file}{Fore.RESET}")
 
         with open(so_file, "rb") as f:
             elf_file = ELFFile(f)
@@ -43,20 +43,31 @@ def find_so_files(opts: argparse.Namespace) -> list:
                     so_name = dynstr.get_string(result.d_val)
                     so_names.add(so_name)
                     if opts.verbose:
-                        print(f"{Fore.YELLOW}  {so_name}{Fore.RESET}")
+                        print(f"  {Fore.YELLOW}{so_name}{Fore.RESET}")
 
     return sorted(so_names)
 
 
 def output_copy_script(opts: argparse.Namespace, so_names: Optional[list] = None) -> None:
     """This function locates the so files and generates copy commands."""
-    lib_paths = {
-        "/lib/x86_64-linux-gnu",
+    lib_paths = [
         "/lib64",
-    }
+        "/lib/x86_64-linux-gnu",
+    ]
     if opts.lib_paths:
         for lpath in opts.lib_paths:
-            lib_paths.add(lpath)
+            if lpath not in lib_paths:
+                lib_paths.append(lpath)
+
+    for so_name in so_names:
+        if opts.verbose:
+            print(f"Looking for: {Fore.YELLOW}{so_name}{Fore.RESET}")
+        for lpath in lib_paths:
+            for so_file in Path(lpath).glob(f"**/{so_name}"):
+                if opts.verbose:
+                    print(f"  Found: {Fore.GREEN}{so_file}{Fore.RESET}")
+                if so_file.is_symlink():
+                    print(f"    Link to: {Fore.CYAN}{so_file.resolve()}{Fore.RESET}")
 
 
 def main(args: Optional[list] = None) -> int:
