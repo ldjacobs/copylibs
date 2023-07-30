@@ -2,6 +2,7 @@
    This is intended to support copying individual libraries into a distroless Docker image."""
 import argparse
 import sys
+from copy import copy
 from pathlib import Path
 from typing import Optional
 
@@ -48,16 +49,21 @@ def find_so_files(opts: argparse.Namespace) -> list:
     return sorted(so_names)
 
 
-def output_copy_script(opts: argparse.Namespace, so_names: Optional[list] = None) -> None:
+def find_so_files_and_links(opts: argparse.Namespace, so_names: Optional[list] = None) -> dict:
     """This function locates the so files and generates copy commands."""
-    lib_paths = [
+    so_files_and_links = {}
+
+    std_lib_paths = [
         "/lib64",
         "/lib/x86_64-linux-gnu",
     ]
+    lib_paths = []
     if opts.lib_paths:
         for lpath in opts.lib_paths:
             if lpath not in lib_paths:
                 lib_paths.append(lpath)
+    else:
+        lib_paths = copy(std_lib_paths)
 
     for so_name in so_names:
         if opts.verbose:
@@ -67,7 +73,15 @@ def output_copy_script(opts: argparse.Namespace, so_names: Optional[list] = None
                 if opts.verbose:
                     print(f"  Found: {Fore.GREEN}{so_file}{Fore.RESET}")
                 if so_file.is_symlink():
-                    print(f"    Link to: {Fore.CYAN}{so_file.resolve()}{Fore.RESET}")
+                    print(f"    Link to: {Fore.CYAN}{so_file.readlink()}{Fore.RESET}")
+
+    return so_files_and_links
+
+
+def output_copy_script(opts: argparse.Namespace, so_files_and_links: dict) -> int:
+    """This function takes what has been found and outputs a script to copy shared library
+    files from one Docker image into another, for multi-stage distroless builds."""
+    return 0
 
 
 def main(args: Optional[list] = None) -> int:
@@ -153,8 +167,8 @@ def main(args: Optional[list] = None) -> int:
     opts = parser.parse_args(args)
 
     so_files = find_so_files(opts)
-    output_copy_script(opts, so_files)
-    return 0
+    so_files_and_links = find_so_files_and_links(opts, so_files)
+    return output_copy_script(opts, so_files_and_links)
 
 
 if __name__ == "__main__":
